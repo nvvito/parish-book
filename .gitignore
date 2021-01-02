@@ -1,0 +1,5 @@
+.vscode
+.env
+.eslintrc.js
+.eslintignore
+node_modules

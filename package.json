@@ -1,0 +1,35 @@
+{
+  "name": "parish-book",
+  "version": "1.0.0",
+  "description": "free parish book app from vito",
+  "main": "index.js",
+  "scripts": {
+    "eslint": "eslint",
+    "start": "node index.js"
+  },
+  "author": "vito",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.0.0",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "helmet": "^4.3.1",
+    "jsonwebtoken": "^8.5.1",
+    "lodash": "^4.17.20",
+    "moment": "^2.29.1",
+    "mongoose": "^5.11.8",
+    "winston": "^3.3.3"
+  },
+  "devDependencies": {
+    "eslint": "^7.16.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-plugin-align-assignments": "^1.1.2",
+    "eslint-plugin-import": "^2.22.1"
+  },
+  "engines": {
+    "node": "12.18.3"
+  }
+}
