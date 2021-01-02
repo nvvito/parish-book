@@ -20,8 +20,10 @@ app.use(helmet());
 // server app routes
 app.use(router);
 // start server app
-const server = app.listen(SERVER.PORT, () => {
-    logger.info(`App listening ${SERVER.PORT} port,`, 'pid: ', process.pid);
+// get PORT for heroku
+const port = process.env.PORT || SERVER.PORT;
+const server = app.listen(port, () => {
+    logger.info(`App listening ${port} port,`, 'pid: ', process.pid);
 });
 // connect to DB
 // mongodb+srv:
