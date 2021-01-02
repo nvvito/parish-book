@@ -1,1 +1,1 @@
-app: node index.js $PORT
+app: node index.js $SERVER_PORT
