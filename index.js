@@ -21,7 +21,7 @@ app.use(helmet());
 app.use(router);
 // start server app
 // get PORT for heroku
-const port = process.env.PORT || SERVER.PORT;
+const port   = process.env.PORT || SERVER.PORT;
 const server = app.listen(port, () => {
     logger.info(`App listening ${port} port,`, 'pid: ', process.pid);
 });

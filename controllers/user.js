@@ -146,6 +146,26 @@ class UserController {
         }
     }
 
+    async searchUser (request, response) {
+        const { text } = request.query;
+
+        try {
+            const result = await this._userModel.searchUser(text);
+
+            return response.send({
+                error:   false,
+                message: result
+            });
+        } catch (err) {
+            logger.error(this._getContext('getAll'), err);
+
+            return response.status(500).send({
+                error:   true,
+                message: errorToString(err)
+            });
+        }
+    }
+
     _getContext (functionName) {
         return `An Error occurred while handle userController.${functionName}:`;
     }

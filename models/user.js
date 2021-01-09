@@ -53,6 +53,7 @@ const UserSchema = new Schema({
 UserSchema.index({ firstName: 1 });
 UserSchema.index({ lastName: 1, firstName: 1, patronymic: 1, birthday: 1 });
 UserSchema.index({ _id: 1, gender: 1 });
+UserSchema.index({ lastName: 'text', firstName: 'text', patronymic: 'text', birthday: 1 });
 /* eslint-enable sort-keys */
 
 /**
@@ -99,10 +100,11 @@ UserSchema.statics.getPopulatedUsers = async function () {
                     },
                     {
                         $project: {
-                            count:   { $size: '$children' },
-                            partner: {
+                            count:    { $size: '$children' },
+                            marriage: '$marriage',
+                            partner:  {
                                 $and: ['$father_id', '$mother_id']
-                            }
+                            },
                         }
                     }
                 ]
@@ -125,6 +127,14 @@ UserSchema.statics.getPopulatedUsers = async function () {
                             '$family.count',
                             0
                         ]
+                },
+                marriageDate: {
+                    $cond:
+                    [
+                        { $ifNull: [ '$family', false ] },
+                        '$family.marriage',
+                        null
+                    ]
                 },
                 partner: {
                     $cond:
@@ -156,6 +166,39 @@ UserSchema.statics.getPopulatedUsers = async function () {
     ]);
 
     return result;
+};
+
+UserSchema.statics.searchUser = async function (searchText) {
+    let filterQuery    = {};
+    const searchFilter = searchText ? searchText.split(' ').filter(el => el !== '') : [];
+
+    if (searchFilter.length === 1) {
+        filterQuery = {
+            $or: [
+                { lastName: new RegExp(searchFilter[0], 'i') },
+                { firstName: new RegExp(searchFilter[0], 'i') }
+            ]
+        };
+    } else if (searchFilter.length > 1) {
+        filterQuery = {
+            $or: [
+                { firstName: new RegExp(searchFilter[1], 'i'), lastName: new RegExp(searchFilter[0], 'i') },
+                { firstName: new RegExp(searchFilter[0], 'i'), patronymic: new RegExp(searchFilter[1], 'i') }
+            ]
+        };
+    }
+
+    return this
+        .find(filterQuery)
+        .limit(5)
+        .sort({
+            /* eslint-disable sort-keys */
+            lastName:   1,
+            firstName:  1,
+            patronymic: 1,
+            birthday:   1
+            /* eslint-ensable sort-keys */
+        });
 };
 
 const userModel = model(USER.MODEL_NAME, UserSchema);
