@@ -1,6 +1,6 @@
 const ld = require('lodash');
 
-const { model, Schema, Types } = require('mongoose');
+const { model, Schema, Types, isValidObjectId } = require('mongoose');
 
 const { ObjectId: objectId } = Types;
 
@@ -56,6 +56,10 @@ FamilySchema.index({ children: 1 });
  * @returns {Family}
  */
 FamilySchema.statics.getOneById = async function (familyId, session, populate) {
+    if (!isValidObjectId(familyId)) {
+        throw new NoDataError('Сім\'ю', { _id: familyId });
+    }
+
     const family = populate
         ? await this
             .findById(familyId, null, { session })
@@ -66,7 +70,7 @@ FamilySchema.statics.getOneById = async function (familyId, session, populate) {
             .findOne(familyId, null, { session });
 
     if (!family) {
-        throw new NoDataError('family', familyId);
+        throw new NoDataError('Сім\'ю', familyId);
     }
 
     return family;
@@ -95,7 +99,7 @@ FamilySchema.statics.getParentFamily = async function (parentId, parentGender, s
             .findOne(query, null, { session });
 
     if (!family) {
-        throw new NoDataError('family', query);
+        throw new NoDataError('Сім\'ю', query);
     }
 
     return family;
@@ -161,7 +165,7 @@ FamilySchema.statics.getChildFamily = async function (childId, session, populate
             .findOne(query, null, { session });
 
     if (!family) {
-        throw new NoDataError('family', query);
+        throw new NoDataError('Сім\'ю', query);
     }
 
     return family;

@@ -39,7 +39,7 @@ AdminSchema.statics.getOneByUsername = async function (username) {
     const admin = await this.findOne(query);
 
     if (!admin) {
-        throw new NoDataError('admin', query);
+        throw new NoDataError('Адміністратора', query);
     }
 
     return admin;

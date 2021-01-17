@@ -1,6 +1,10 @@
+const mongoose = require('mongoose');
+
 const familyModel = require('../models/family');
 const userModel   = require('../models/user');
 
+
+const { FAMILY }        = require('../common/constants');
 const { NoDataError }   = require('../common/errors');
 const { logger }        = require('../common/logger');
 const { errorToString } = require('../common/utils');
@@ -105,7 +109,7 @@ class UserController {
             const result  = await this._userModel.findByIdAndUpdate(_id, { $set: doc }, options);
 
             if (!result) {
-                throw new NoDataError('user', _id);
+                throw new NoDataError('Парафіянина', _id);
             }
 
             return response.send({
@@ -126,11 +130,54 @@ class UserController {
         const { _id } = request.params;
 
         try {
-            const result = await this._userModel.findByIdAndRemove(_id);
+            let result;
 
-            if (!result) {
-                throw new NoDataError('user', _id);
-            }
+            await mongoose.connection.transaction(async (session) => {
+                const user = await this._userModel.getOneById(_id, 'Парафіянина', session);
+                // check parent family
+                try {
+                    const userParentFamily = await this._familyModel.getParentFamily(user._id, user.gender, session);
+
+                    if (this._familyModel.familyMustRemove(userParentFamily)) {
+                        await this._familyModel.findByIdAndDelete(userParentFamily._id);
+                    } else {
+                        // remove from family
+                        userParentFamily[FAMILY.FIELD_NAME[user.gender]] = null;
+                        userParentFamily.marriage                        = null;
+
+                        await userParentFamily.save();
+                    }
+                } catch (err) {
+                    if (!(err instanceof NoDataError)) {
+                        throw err;
+                    }
+                }
+                // check child family
+                try {
+                    const userChildFamily = await this._familyModel.getChildFamily(user._id, session);
+
+                    if (this._familyModel.familyMustRemove(userChildFamily)) {
+                        await this._familyModel.findByIdAndDelete(userChildFamily._id);
+                    } else {
+                        // remove from family
+                        userChildFamily.children = userChildFamily.children.filter(c => String(c._id) !== String(user._id));
+
+                        await userChildFamily.save();
+                    }
+                } catch (err) {
+                    if (!(err instanceof NoDataError)) {
+                        throw err;
+                    }
+                }
+                // remove user
+                result = await this._userModel.findByIdAndRemove(user._id);
+
+                if (!result) {
+                    throw new NoDataError('Парафіянина', _id);
+                }
+
+                return result;
+            });
 
             return response.send({
                 error:   false,

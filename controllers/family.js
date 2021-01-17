@@ -475,7 +475,7 @@ class FamilyController {
             }
             // check the need for removal
             if (this._familyModel.familyMustRemove(userFamily)) {
-                await this.findByIdAndDelete(userFamily._id);
+                await this._familyModel.findByIdAndDelete(userFamily._id);
 
                 return response.send({
                     error:   false,
@@ -520,7 +520,7 @@ class FamilyController {
             }
             // check the need for removal
             if (this._familyModel.familyMustRemove(userFamily)) {
-                await this.findByIdAndDelete(userFamily._id);
+                await this._familyModel.findByIdAndDelete(userFamily._id);
 
                 return response.send({
                     error:   false,
@@ -564,7 +564,7 @@ class FamilyController {
             }
             // check the need for removal
             if (this._familyModel.familyMustRemove(userFamily)) {
-                await this.findByIdAndDelete(userFamily._id);
+                await this._familyModel.findByIdAndDelete(userFamily._id);
 
                 return response.send({
                     error:   false,
@@ -609,7 +609,7 @@ class FamilyController {
             }
             // check the need for removal
             if (this._familyModel.familyMustRemove(userFamily)) {
-                await this.findByIdAndDelete(userFamily._id);
+                await this._familyModel.findByIdAndDelete(userFamily._id);
 
                 return response.send({
                     error:   false,
@@ -639,9 +639,19 @@ class FamilyController {
 
         try {
             const user   = await this._userModel.getOneById(userId, 'Парафіянина');
-            const family = await this._familyModel.findById(familyId);
-            // remove user from parents
+            const family = await this._familyModel.getOneById(familyId);
+            // check the need for removal
+            if (this._familyModel.familyMustRemove(family)) {
+                await this._familyModel.findByIdAndDelete(family._id);
+
+                return response.send({
+                    error:   false,
+                    message: null
+                });
+            }
+            // remove user from family
             if (String(family[FAMILY.FIELD_NAME[user.gender]]) === String(user._id)) {
+                // remove user from parents
                 family[FAMILY.FIELD_NAME[user.gender]] = null;
                 family.marriage                        = null;
             } else if (ld.get(family, 'children', []).map(c => String(c._id)).includes(String(user._id))) {
@@ -649,15 +659,6 @@ class FamilyController {
                 family.children = family.children.filter(c => String(c._id) !== String(user._id));
             } else {
                 throw new LogicError('Парафіянин не належить до вказаної сім\'ї');
-            }
-            // check the need for removal
-            if (this._familyModel.familyMustRemove(family)) {
-                await this.findByIdAndDelete(family._id);
-
-                return response.send({
-                    error:   false,
-                    message: null
-                });
             }
             // save changes
             await family.save();

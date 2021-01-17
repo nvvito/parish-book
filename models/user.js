@@ -1,4 +1,4 @@
-const { model, Schema } = require('mongoose');
+const { model, Schema, isValidObjectId } = require('mongoose');
 
 const { USER }        = require('../common/constants');
 const { NoDataError } = require('../common/errors');
@@ -65,7 +65,11 @@ UserSchema.index({ lastName: 'text', firstName: 'text', patronymic: 'text', birt
  *
  * @returns {Boolean}
  */
-UserSchema.statics.getOneById = async function (userId, label = 'user', session) {
+UserSchema.statics.getOneById = async function (userId, label = 'Парафіянина', session) {
+    if (!isValidObjectId(userId)) {
+        throw new NoDataError('Парафіянина', { _id: userId });
+    }
+
     const user = await this.findById(userId, null, { session });
 
     if (!user) {
