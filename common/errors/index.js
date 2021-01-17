@@ -16,8 +16,8 @@ class NoDataError extends Error {
         }
 
         super(oneLine(`
-            Error requesting
-            (Reason: The ${dataName} not found for query=${queryString})
+            Помилка запиту
+            (Причина: ${dataName} не знайдено для запипу query=${queryString})
         `));
 
         this.dataName = dataName;
@@ -27,13 +27,13 @@ class NoDataError extends Error {
 exports.NoDataError = NoDataError;
 
 class LogicError extends Error {
-    constructor (message) {
+    constructor (text) {
         super(oneLine(`
-            Error in action logic
-            (Reason: ${message})
+            Помилка логіки
+            (Причина: ${text})
         `));
 
-        this.message = message;
+        this.text = text;
     }
 }
 exports.LogicError = LogicError;

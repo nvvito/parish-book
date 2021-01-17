@@ -21,21 +21,21 @@ class FamilyController {
         const { date }     = request.body;
 
         try {
-            const family = await this._familyModel.getOneById(familyId, null, 'populate');
+            const family = await this._familyModel.getOneById(familyId, 'Сім\'ї', 'populate');
             // check date validation
             if (!date || !moment(date).isValid()) {
-                throw new LogicError('Invalid date of marriage');
+                throw new LogicError('Невірний формат дати шлюбу');
             }
             // check parents existing
             if (!family.father_id || !family.mother_id) {
-                throw new LogicError('Two parents are required to set a marriage date');
+                throw new LogicError('Для запису дати шлюбу необхідно два партнери');
             }
             // check the ratio of years
             if (
                 moment(ld.get(family, 'father_id.birthday', null)).isSameOrAfter(date)
                 || moment(ld.get(family, 'mother_id.birthday', null)).isSameOrAfter(date)
             ) {
-                throw new LogicError('The date of marriage cannot be earlier than the birth of the parents');
+                throw new LogicError('Дата шлюбу не може бути меншою за дати народження партнерів');
             }
 
             this._familyModel.depopulateFamily(family);
@@ -58,38 +58,59 @@ class FamilyController {
 
     async addParent (request, response) {
         const { userId, parentId } = request.params;
+        const { gender }           = request.query;
 
         try {
+            // check gender param
+            if (!Object.values(USER.GENDER).includes(gender)) {
+                throw new LogicError('Не вказано, або вказано із помилкою стать');
+            }
+
             let result;
             // check ids equality
             if (String(userId) === String(parentId)) {
-                throw new LogicError('The user cannot be a parent for himself');
+                throw new LogicError('Парафіянин не може бути батьком чи матірью для себе');
             }
 
             await mongoose.connection.transaction(async (session) => {
-                const user   = await this._userModel.getOneById(userId, 'user', session);
-                const parent = await this._userModel.getOneById(parentId, 'parent', session);
+                const user   = await this._userModel.getOneById(userId, 'Парафіянина', session);
+                const parent = await this._userModel.getOneById(parentId, 'Батька чи матір', session);
+                // check gender
+                if (gender !== parent.gender) {
+                    throw new LogicError('Батько не може бути жінкою або матір чоловіком');
+                }
                 // check the ratio of years
                 if (moment(parent.birthday).isSameOrAfter(user.birthday)) {
-                    throw new LogicError('The parent cannot be younger than a user');
+                    throw new LogicError('Батько чи матір не можуть бути молодші за дітей');
+                }
+                // check ties between partners
+                try {
+                    const userParentFamily = await this._familyModel.getParentFamily(userId, user.gender, session);
+                    if (String(userParentFamily[FAMILY.FIELD_NAME[parent.gender]]) === String(parentId)) {
+                        throw new LogicError('Чоловік чи дружина не можуть бути батьком чи матіроью');
+                    }
+                } catch (err) {
+                    if (!(err instanceof NoDataError)) {
+                        throw err;
+                    }
                 }
 
                 try {
                     const userFamily = await this._familyModel.getChildFamily(userId, session, 'populate');
                     // check ties between parent and child
                     if (ld.get(userFamily, 'children', []).map(c => String(c._id)).includes(String(parentId))) {
-                        throw new LogicError('The brother or the sister cannot be a parent');
+                        throw new LogicError('Брат чи сестра не можуть бути батьками для парафіянина');
                     }
                     // check the ratio of years
                     if (ld.get(userFamily, 'children', []).some(c => moment(parent.birthday).isSameOrAfter(c.birthday))) {
-                        throw new LogicError('The parent cannot be younger than a user');
+                        throw new LogicError('Батько чи матір не можуть бути молодші за дітей');
                     }
 
                     try {
                         const parentFamily = await this._familyModel.getParentFamily(parentId, parent.gender, session);
                         // check the parent has no other family
                         if (String(parentFamily._id) !== String(userFamily._id)) {
-                            throw new LogicError('The parent and child have different families');
+                            throw new LogicError('Батько чи матір та дитина мають різні сім\'ї');
                         }
 
                         this._familyModel.depopulateFamily(parentFamily);
@@ -115,7 +136,7 @@ class FamilyController {
                             moment(ld.get(parentFamily, 'father_id.birthday', null)).isSameOrAfter(user.birthday)
                             || moment(ld.get(parentFamily, 'mother.birthday', null)).isSameOrAfter(user.birthday)
                         ) {
-                            throw new LogicError('The parent cannot be younger than a user');
+                            throw new LogicError('Батько чи матір не можуть бути молодші за дітей');
                         }
 
                         this._familyModel.depopulateFamily(parentFamily);
@@ -151,17 +172,17 @@ class FamilyController {
             let result;
             // check ids equality
             if (String(userId) === String(siblingId)) {
-                throw new LogicError('The user cannot be a brother or sister to himself');
+                throw new LogicError('Парафіянин не може бути братом чи сестрою до себе');
             }
 
             await mongoose.connection.transaction(async (session) => {
-                const user    = await this._userModel.getOneById(userId, 'user', session);
-                const sibling = await this._userModel.getOneById(siblingId, 'sibling', session);
-                // check ties between parent and parent
+                const user    = await this._userModel.getOneById(userId, 'Парафіянина', session);
+                const sibling = await this._userModel.getOneById(siblingId, 'Брата чи сестру', session);
+                // check ties between partners
                 try {
-                    const userParentFamily = await this._familyModel.getParentFamily(user, user.gender, session);
+                    const userParentFamily = await this._familyModel.getParentFamily(userId, user.gender, session);
                     if (String(userParentFamily[FAMILY.FIELD_NAME[sibling.gender]]) === String(sibling._id)) {
-                        throw new LogicError('The Parents cannot be brother and sister');
+                        throw new LogicError('Батько чи матір не можуть бути братом чи сестрою для парафіянина');
                     }
                 } catch (err) {
                     if (!(err instanceof NoDataError)) {
@@ -173,21 +194,21 @@ class FamilyController {
                     const userFamily = await this._familyModel.getChildFamily(userId, session, 'populate');
                     // check ties between parent and child
                     if (String(ld.get(userFamily, `${FAMILY.FIELD_NAME[sibling.gender]}._id`)) === String(siblingId)) {
-                        throw new LogicError('The parent cannot be a brother or sister to this user');
+                        throw new LogicError('Чоловік чи дружина не можуть бути братом чи сестрою для парафіянина');
                     }
                     // check the ratio of years
                     if (
                         moment(ld.get(userFamily, 'father_id.birthday', null)).isSameOrAfter(sibling.birthday)
                         || moment(ld.get(userFamily, 'mother_id.birthday', null)).isSameOrAfter(sibling.birthday)
                     ) {
-                        throw new LogicError('The parent cannot be younger than the sibling');
+                        throw new LogicError('Батько чи матір не можуть бути молодші за дітей');
                     }
 
                     try {
                         const siblingFamily = await this._familyModel.getChildFamily(siblingId, session);
                         // check the sibling has no other family
                         if (String(siblingFamily._id) !== String(userFamily._id)) {
-                            throw new LogicError('The user and the sibling have different families');
+                            throw new LogicError('Парафіянин та вказаний брат чи сестра мають різні сім\'ї');
                         }
 
                         this._familyModel.depopulateFamily(siblingFamily);
@@ -209,14 +230,14 @@ class FamilyController {
                         const siblingFamily = await this._familyModel.getCreateChildFamily(siblingId, session, 'populate');
                         // check ties between parent and child
                         if (String(ld.get(siblingFamily, `${FAMILY.FIELD_NAME[user.gender]}._id`)) === String(userId)) {
-                            throw new LogicError('The parent cannot be a brother or sister to this sibling');
+                            throw new LogicError('Парафіянин не може бути братом чи сестрою для своїх дітей');
                         }
                         // check the ratio of years
                         if (
                             moment(ld.get(siblingFamily, 'father_id.birthday', null)).isSameOrAfter(user.birthday)
                             || moment(ld.get(siblingFamily, 'mother_id.birthday', null)).isSameOrAfter(user.birthday)
                         ) {
-                            throw new LogicError('The parent cannot be younger than a user');
+                            throw new LogicError('Батько чи матір не можуть бути молодші за дітей');
                         }
 
                         this._familyModel.depopulateFamily(siblingFamily);
@@ -252,15 +273,15 @@ class FamilyController {
             let result;
             // check ids equality
             if (String(userId) === String(partnerId)) {
-                throw new LogicError('The father and the mother in a family cannot be one person');
+                throw new LogicError('Парафіянин не може бути чоловіком чи дружиною для себе');
             }
 
             await mongoose.connection.transaction(async (session) => {
-                const user    = await this._userModel.getOneById(userId, 'parent', session);
-                const partner = await this._userModel.getOneById(partnerId, 'parent', session);
+                const user    = await this._userModel.getOneById(userId, 'Парафіянина', session);
+                const partner = await this._userModel.getOneById(partnerId, 'Чоловіка чи дружину', session);
                 // check gender
                 if (user.gender === partner.gender) {
-                    throw new LogicError('The parents gender are the same');
+                    throw new LogicError('Чоловік і дружина повинні бути різної статі');
                 }
 
                 const father = user.gender === USER.GENDER.MAN ? user : partner;
@@ -269,7 +290,7 @@ class FamilyController {
                 try {
                     const fatherChildFamily = await this._familyModel.getChildFamily(userId, session);
                     if (ld.get(fatherChildFamily, 'children', []).map(c => String(c)).includes(String(mother._id))) {
-                        throw new LogicError('The Parents cannot be brother and sister');
+                        throw new LogicError('Чоловік та дружина не можуть бути братом і сестрою');
                     }
                 } catch (err) {
                     if (!(err instanceof NoDataError)) {
@@ -281,18 +302,18 @@ class FamilyController {
                     const fatherFamily = await this._familyModel.getParentFamily(father._id, father.gender, session, 'populate');
                     // check ties between parent and child
                     if (ld.get(fatherFamily, 'children', []).map(c => String(c._id)).includes(String(mother._id))) {
-                        throw new LogicError('Parent own child cannot be a partner');
+                        throw new LogicError('Батько чи матір не можуть бути чоловіком чи дружиною для своїх дітей');
                     }
                     // check the ratio of years
                     if (ld.get(fatherFamily, 'children', []).some(c => moment(mother.birthday).isSameOrAfter(c.birthday))) {
-                        throw new LogicError('The parent cannot be younger than a child');
+                        throw new LogicError('Батько чи матір не можуть бути молодші за дітей');
                     }
 
                     try {
                         const motherFamily = await this._familyModel.getParentFamily(mother._id, mother.gender, session);
                         // check the mother has no other family
                         if (String(motherFamily._id) !== String(fatherFamily._id)) {
-                            throw new LogicError('The parentshave different families');
+                            throw new LogicError('Чоловік та дружина мають різні сім\'ї');
                         }
 
                         this._familyModel.depopulateFamily(motherFamily);
@@ -315,11 +336,11 @@ class FamilyController {
                         const motherFamily = await this._familyModel.getCreateParentFamily(mother._id, mother.gender, session, 'populate');
                         // check ties between parent and child
                         if (ld.get(motherFamily, 'children', []).map(c => String(c._id)).includes(String(father._id))) {
-                            throw new LogicError('Parent own child cannot be a partner');
+                            throw new LogicError('Батьки не можуть бути чоловіком чи дружиною для своїх дітей');
                         }
                         // check the ratio of years
                         if (ld.get(motherFamily, 'children', []).some(c => moment(father.birthday).isSameOrAfter(c.birthday))) {
-                            throw new LogicError('The parent cannot be younger than a child');
+                            throw new LogicError('Батько чи матір не можуть бути молодші за дітей');
                         }
 
                         this._familyModel.depopulateFamily(motherFamily);
@@ -354,15 +375,15 @@ class FamilyController {
             let result;
             // check ids equality
             if (String(userId) === String(childId)) {
-                throw new LogicError('The user cannot be a child for himself');
+                throw new LogicError('Парафіянин не може бути своєю дитиною');
             }
 
             await mongoose.connection.transaction(async (session) => {
-                const user  = await this._userModel.getOneById(userId, 'user', session);
-                const child = await this._userModel.getOneById(childId, 'parent', session);
+                const user  = await this._userModel.getOneById(userId, 'Парафіянина', session);
+                const child = await this._userModel.getOneById(childId, 'Дитину', session);
                 // check the ratio of years
                 if (moment(user.birthday).isSameOrAfter(child.birthday)) {
-                    throw new LogicError('The user cannot be younger than the child');
+                    throw new LogicError('Батько чи матір не можуть бути молодші за дітей');
                 }
 
                 try {
@@ -372,14 +393,14 @@ class FamilyController {
                         moment(ld.get(userFamily, 'father_id.birthday', null)).isSameOrAfter(child.birthday)
                     || moment(ld.get(userFamily, 'mother.birthday', null)).isSameOrAfter(child.birthday)
                     ) {
-                        throw new LogicError('The parent cannot be younger than the child');
+                        throw new LogicError('Батько чи матір не можуть бути молодші за дітей');
                     }
 
                     try {
                         const parentFamily = await this._familyModel.getChildFamily(childId, session);
                         // check the parent has no other family
                         if (String(parentFamily._id) !== String(userFamily._id)) {
-                            throw new LogicError('The parent and child have different families');
+                            throw new LogicError('Батько чи матір та дитина мають різні сім\'ї');
                         }
 
                         this._familyModel.depopulateFamily(parentFamily);
@@ -402,11 +423,11 @@ class FamilyController {
                         const childFamily = await this._familyModel.getCreateChildFamily(childId, session, 'populate');
                         // check ties between parent and child
                         if (ld.get(childFamily, 'children', []).map(c => String(c._id)).includes(String(userId))) {
-                            throw new LogicError('The brother or the sister cannot be a parent');
+                            throw new LogicError('Брати чи сестри не можуть бути батьком чи матірью');
                         }
                         // check the ratio of years
                         if (ld.get(childFamily, 'children', []).some(c => moment(user.birthday).isSameOrAfter(c.birthday))) {
-                            throw new LogicError('The user cannot be younger than the child');
+                            throw new LogicError('Батько чи матір не можуть бути молодші за дітей');
                         }
 
                         this._familyModel.depopulateFamily(childFamily);
@@ -441,16 +462,16 @@ class FamilyController {
         try {
             // check ids equality
             if (String(userId) === String(parentId)) {
-                throw new LogicError('The user cannot be a parent for himself');
+                throw new LogicError('Парафіянин не може бути своїм батьком чи матірью');
             }
 
-            const user   = await this._userModel.getOneById(userId);
-            const parent = await this._userModel.getOneById(parentId, 'parent');
+            const user   = await this._userModel.getOneById(userId, 'Парафіянина');
+            const parent = await this._userModel.getOneById(parentId, 'Батька чи дружину');
 
             const userFamily = await this._familyModel.getChildFamily(user._id);
             // check ties between parent and child
             if (String(userFamily[FAMILY.FIELD_NAME[parent.gender]]) !== String(parentId)) {
-                throw new LogicError('Family with such ties not found');
+                throw new LogicError('Сім\'ї з вказаним батьком чи матірью не має');
             }
             // check the need for removal
             if (this._familyModel.familyMustRemove(userFamily)) {
@@ -486,16 +507,16 @@ class FamilyController {
         try {
             // check ids equality
             if (String(userId) === String(siblingId)) {
-                throw new LogicError('The user cannot be a brother or sister to himself');
+                throw new LogicError('Парафіянин не може бути братом чи сестрою до себе');
             }
 
-            const user    = await this._userModel.getOneById(userId);
-            const sibling = await this._userModel.getOneById(siblingId, 'sibling');
+            const user    = await this._userModel.getOneById(userId, 'Парафіянина');
+            const sibling = await this._userModel.getOneById(siblingId, 'Брата чи сестру');
 
             const userFamily = await this._familyModel.getChildFamily(user._id);
             // check ties between parent and child
             if (!ld.get(userFamily, 'children', []).map(c => String(c._id)).includes(String(siblingId))) {
-                throw new LogicError('Family with such ties not found');
+                throw new LogicError('Сімі\'ї з вказаним бартом чи сестрою не має');
             }
             // check the need for removal
             if (this._familyModel.familyMustRemove(userFamily)) {
@@ -530,16 +551,16 @@ class FamilyController {
         try {
             // check ids equality
             if (String(userId) === String(partnerId)) {
-                throw new LogicError('The father and the mother in a family cannot be one person');
+                throw new LogicError('Парафіянин не може бути чоловіком і дружиною до себе');
             }
 
-            const user    = await this._userModel.getOneById(userId);
-            const partner = await this._userModel.getOneById(partnerId, 'sibling');
+            const user    = await this._userModel.getOneById(userId, 'Парафіянина');
+            const partner = await this._userModel.getOneById(partnerId, 'Чоловіка чи дружини');
 
             const userFamily = await this._familyModel.getParentFamily(user._id, user.gender);
             // check ties between parent and child
             if (String(userFamily[FAMILY.FIELD_NAME[partner.gender]]) !== String(partner._id)) {
-                throw new LogicError('Family with such ties not found');
+                throw new LogicError('Сімі\'ї з вказаним чоловіком чи дружиною не має');
             }
             // check the need for removal
             if (this._familyModel.familyMustRemove(userFamily)) {
@@ -575,16 +596,16 @@ class FamilyController {
         try {
             // check ids equality
             if (String(userId) === String(childId)) {
-                throw new LogicError('The user cannot be a child for himself');
+                throw new LogicError('Парафіянин не може бути своєю дитиною');
             }
 
-            const user  = await this._userModel.getOneById(userId);
-            const child = await this._userModel.getOneById(childId, 'sibling');
+            const user  = await this._userModel.getOneById(userId, 'Парафіянина');
+            const child = await this._userModel.getOneById(childId, 'Дитини');
 
             const userFamily = await this._familyModel.getParentFamily(user._id, user.gender);
             // check ties between parent and child
             if (!ld.get(userFamily, 'children', []).map(c => String(c._id)).includes(String(child._id))) {
-                throw new LogicError('Family with such ties not found');
+                throw new LogicError('Сімі\'ї з вказаною дитиною не має');
             }
             // check the need for removal
             if (this._familyModel.familyMustRemove(userFamily)) {
@@ -617,7 +638,7 @@ class FamilyController {
         const { userId, familyId } = request.params;
 
         try {
-            const user   = await this._userModel.getOneById(userId);
+            const user   = await this._userModel.getOneById(userId, 'Парафіянина');
             const family = await this._familyModel.findById(familyId);
             // remove user from parents
             if (String(family[FAMILY.FIELD_NAME[user.gender]]) === String(user._id)) {
@@ -627,7 +648,7 @@ class FamilyController {
                 // remove user from children
                 family.children = family.children.filter(c => String(c._id) !== String(user._id));
             } else {
-                throw new LogicError('The user is not in the specified family');
+                throw new LogicError('Парафіянин не належить до вказаної сім\'ї');
             }
             // check the need for removal
             if (this._familyModel.familyMustRemove(family)) {
@@ -656,7 +677,7 @@ class FamilyController {
     }
 
     _getContext (functionName) {
-        return `An Error occurred while handle familyController.${functionName}:`;
+        return `Виникла помилка при обробці familyController.${functionName}:`;
     }
 }
 

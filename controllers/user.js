@@ -167,7 +167,7 @@ class UserController {
     }
 
     _getContext (functionName) {
-        return `An Error occurred while handle userController.${functionName}:`;
+        return `Виникла помилка при обробці userController.${functionName}:`;
     }
 }
 

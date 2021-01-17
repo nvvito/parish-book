@@ -17,11 +17,11 @@ class EventController {
         const { startDate, endDate } = request.query;
 
         if (!moment(startDate).isValid() || !moment(endDate).isValid()) {
-            throw new LogicError('The start and end dates must have a date format');
+            throw new LogicError('Дати початку та кінця повинні мати формат дати');
         }
 
         if (moment(startDate).isAfter(moment(endDate))) {
-            throw new LogicError('The end date must be after the start date');
+            throw new LogicError('Дата кінця повинна бути після дати початку');
         }
 
         function getQuery () {
@@ -142,7 +142,7 @@ class EventController {
     }
 
     _getContext (functionName) {
-        return `An Error occurred while handle authController.${functionName}:`;
+        return `Виникла помилка при обробці authController.${functionName}:`;
     }
 }
 

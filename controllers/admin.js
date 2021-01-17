@@ -42,7 +42,7 @@ class AuthController {
     }
 
     _getContext (functionName) {
-        return `An Error occurred while handle authController.${functionName}:`;
+        return `Виникла помилка при обробці authController.${functionName}:`;
     }
 }
 
