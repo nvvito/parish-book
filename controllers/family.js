@@ -21,9 +21,9 @@ class FamilyController {
         const { date }     = request.body;
 
         try {
-            const family = await this._familyModel.getOneById(familyId, 'Сім\'ї', 'populate');
+            const family = await this._familyModel.getOneById(familyId, null, 'populate');
             // check date validation
-            if (!date || !moment(date).isValid()) {
+            if (date !== null && (!date || !moment(date).isValid())) {
                 throw new LogicError('Невірний формат дати шлюбу');
             }
             // check parents existing
@@ -32,14 +32,17 @@ class FamilyController {
             }
             // check the ratio of years
             if (
-                moment(ld.get(family, 'father_id.birthday', null)).isSameOrAfter(date)
-                || moment(ld.get(family, 'mother_id.birthday', null)).isSameOrAfter(date)
+                date
+                && (
+                    moment(ld.get(family, 'father_id.birthday', null)).isSameOrAfter(date)
+                    || moment(ld.get(family, 'mother_id.birthday', null)).isSameOrAfter(date)
+                )
             ) {
                 throw new LogicError('Дата шлюбу не може бути меншою за дати народження партнерів');
             }
 
             this._familyModel.depopulateFamily(family);
-            family.marriage = moment.utc(date);
+            family.marriage = date ? moment.utc(date) : null;
             await family.save();
 
             return response.send({
@@ -387,7 +390,7 @@ class FamilyController {
                 }
 
                 try {
-                    const userFamily = await this._familyModel.getCreateParentFamily(userId, user.gender, session, 'populate');
+                    const userFamily = await this._familyModel.getParentFamily(userId, user.gender, session, 'populate');
                     // check the ratio of years
                     if (
                         moment(ld.get(userFamily, 'father_id.birthday', null)).isSameOrAfter(child.birthday)
@@ -397,15 +400,15 @@ class FamilyController {
                     }
 
                     try {
-                        const parentFamily = await this._familyModel.getChildFamily(childId, session);
-                        // check the parent has no other family
-                        if (String(parentFamily._id) !== String(userFamily._id)) {
+                        const childFamily = await this._familyModel.getChildFamily(childId, session);
+                        // check the child has no other family
+                        if (String(childFamily._id) !== String(userFamily._id)) {
                             throw new LogicError('Батько чи матір та дитина мають різні сім\'ї');
                         }
 
-                        this._familyModel.depopulateFamily(parentFamily);
-                        result = parentFamily;
-                        return parentFamily;
+                        this._familyModel.depopulateFamily(childFamily);
+                        result = childFamily;
+                        return childFamily;
                     } catch (err) {
                         if (!(err instanceof NoDataError)) {
                             throw err;
@@ -413,7 +416,7 @@ class FamilyController {
                     }
 
                     this._familyModel.depopulateFamily(userFamily);
-                    userFamily.children.push(userId);
+                    userFamily.children.push(childId);
                     await userFamily.save({ session });
 
                     result = userFamily;

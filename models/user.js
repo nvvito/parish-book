@@ -52,8 +52,6 @@ const UserSchema = new Schema({
 // indexes
 UserSchema.index({ firstName: 1 });
 UserSchema.index({ lastName: 1, firstName: 1, patronymic: 1, birthday: 1 });
-UserSchema.index({ _id: 1, gender: 1 });
-UserSchema.index({ lastName: 'text', firstName: 'text', patronymic: 'text', birthday: 1 });
 /* eslint-enable sort-keys */
 
 /**
@@ -85,6 +83,17 @@ UserSchema.statics.getOneById = async function (userId, label = 'Парафія�
  */
 UserSchema.statics.getPopulatedUsers = async function () {
     const result = await this.aggregate([
+        // sort users
+        {
+            /* eslint-disable sort-keys */
+            $sort: {
+                lastName:   1,
+                firstName:  1,
+                patronymic: 1,
+                birthday:   1
+            }
+            /* eslint-ensable sort-keys */
+        },
         // add user family
         {
             $lookup: {
@@ -155,17 +164,6 @@ UserSchema.statics.getPopulatedUsers = async function () {
             $project: {
                 family: 0
             }
-        },
-        // sort results
-        {
-            /* eslint-disable sort-keys */
-            $sort: {
-                lastName:   1,
-                firstName:  1,
-                patronymic: 1,
-                birthday:   1
-            }
-            /* eslint-ensable sort-keys */
         }
     ]);
 
@@ -183,11 +181,18 @@ UserSchema.statics.searchUser = async function (searchText) {
                 { firstName: new RegExp(searchFilter[0], 'i') }
             ]
         };
-    } else if (searchFilter.length > 1) {
+    } else if (searchFilter.length === 2) {
         filterQuery = {
             $or: [
                 { firstName: new RegExp(searchFilter[1], 'i'), lastName: new RegExp(searchFilter[0], 'i') },
+                { firstName: new RegExp(searchFilter[0], 'i'), lastName: new RegExp(searchFilter[1], 'i') },
                 { firstName: new RegExp(searchFilter[0], 'i'), patronymic: new RegExp(searchFilter[1], 'i') }
+            ]
+        };
+    } else if (searchFilter.length > 2) {
+        filterQuery = {
+            $or: [
+                { firstName: new RegExp(searchFilter[1], 'i'), lastName: new RegExp(searchFilter[0], 'i'), patronymic: new RegExp(searchFilter[2], 'i') }
             ]
         };
     }

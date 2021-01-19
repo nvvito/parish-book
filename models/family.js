@@ -67,7 +67,7 @@ FamilySchema.statics.getOneById = async function (familyId, session, populate) {
             .populate('mother_id')
             .populate('children')
         : await this
-            .findOne(familyId, null, { session });
+            .findById(familyId, null, { session });
 
     if (!family) {
         throw new NoDataError('Сім\'ю', familyId);
