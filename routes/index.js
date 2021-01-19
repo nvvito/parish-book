@@ -1,6 +1,8 @@
 const path = require('path');
 
-const { Router: createRouter } = require('express');
+const express = require('express');
+
+const { Router: createRouter } = express;
 // routes
 const adminRoute  = require('./admin');
 const familyRoute = require('./family');
@@ -29,6 +31,7 @@ router.get('/assets/:fileName', (request, response) => {
     });
 });
 // client app
+router.use(express.static('public/client/build'));
 router.get('*', (request, response) => {
     response.sendFile(path.join(__dirname, '../public/client/build/index.html'), (err) => {
         if (err) {
