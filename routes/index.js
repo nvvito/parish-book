@@ -31,7 +31,6 @@ router.get('/assets/:fileName', (request, response) => {
     });
 });
 // client app
-router.use(express.static('public/client/build'));
 router.get('*', (request, response) => {
     response.sendFile(path.join(__dirname, '../public/client/build/index.html'), (err) => {
         if (err) {
