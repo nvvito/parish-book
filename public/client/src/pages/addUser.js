@@ -195,8 +195,8 @@ export default function AddUser () {
                             onChange={changeGender}
                             disabled={load}
                         >
-                            <Radio.Button value='man'>Man</Radio.Button>
-                            <Radio.Button value='woman'>Woman</Radio.Button>
+                            <Radio.Button value='man'>Чоловік</Radio.Button>
+                            <Radio.Button value='woman'>Жінка</Radio.Button>
                         </Radio.Group>
                     </FormItem>
                 </div>

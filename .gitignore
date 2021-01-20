@@ -3,3 +3,5 @@
 .eslintrc.js
 .eslintignore
 node_modules
+
+.eslintcache
