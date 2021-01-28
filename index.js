@@ -55,7 +55,7 @@ function gracefulStop (signal) {
         mongoose.connection.close(false, () => {
             logger.info('The DB connection is deinitialized successful');
             logger.info('The end of the graceful stop');
-            setTimeout(() => process.exit(0), 0);
+            setTimeout(() => process.exit(0), 0).unref();
         });
     });
 }
